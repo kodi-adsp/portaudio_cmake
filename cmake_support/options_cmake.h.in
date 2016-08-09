@@ -16,16 +16,18 @@
    Source template: cmake_support/options_cmake.h.in
 */
 
-#ifdef _WIN32
-#if defined(PA_USE_ASIO) || defined(PA_USE_DS) || defined(PA_USE_WMME) || defined(PA_USE_WASAPI) || defined(PA_USE_WDMKS)
+#if defined(PA_USE_ASIO) || defined(PA_USE_DS) || defined(PA_USE_WMME) || defined(PA_USE_WASAPI) || defined(PA_USE_WDMKS) || defined(PA_USE_ALSA)
 #error "This header needs to be included before pa_hostapi.h!!"
 #endif
 
+#ifdef _WIN32
 #cmakedefine01 PA_USE_ASIO
 #cmakedefine01 PA_USE_DS
 #cmakedefine01 PA_USE_WMME
 #cmakedefine01 PA_USE_WASAPI
 #cmakedefine01 PA_USE_WDMKS
+#elif __linux__
+#cmakedefine01 PA_USE_ALSA
 #else
 #error "Platform currently not supported by CMake script"
 #endif

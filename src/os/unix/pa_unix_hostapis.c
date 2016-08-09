@@ -40,6 +40,10 @@
  @ingroup unix_src
 */
 
+#ifdef PORTAUDIO_CMAKE_GENERATED
+#include "options_cmake.h"
+#endif
+
 #include "pa_hostapi.h"
 
 PaError PaJack_Initialize( PaUtilHostApiRepresentation **hostApi, PaHostApiIndex index );

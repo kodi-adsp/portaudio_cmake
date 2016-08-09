@@ -16,7 +16,7 @@ IF(CMAKE_CL_64)
 ELSE(CMAKE_CL_64)
   SET(TARGET_POSTFIX x86)
   IF(PA_CONFIG_LIB_OUTPUT_PATH)
-  SET(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/bin/Win32)
+    SET(LIBRARY_OUTPUT_PATH ${CMAKE_CURRENT_BINARY_DIR}/bin/Win32)
   ENDIF(PA_CONFIG_LIB_OUTPUT_PATH)
 ENDIF(CMAKE_CL_64)
 
@@ -71,6 +71,10 @@ IF(WIN32)
     OPTION(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE "Use DirectSound full duplex create" ON)
     MARK_AS_ADVANCED(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE)
   ENDIF(PA_USE_DS)
+ELSEIF(UNIX)
+  FIND_PACKAGE(ALSA REQUIRED)
+
+  OPTION(PA_USE_ALSA "Enable support for ALSA" ON)
 ENDIF(WIN32)
 
 # Set variables for DEF file expansion
@@ -93,6 +97,8 @@ ENDIF(PA_USE_DIRECTSOUNDFULLDUPLEXCREATE)
 #######################################
 IF(WIN32)
   INCLUDE_DIRECTORIES(src/os/win)
+ELSEIF(UNIX)
+  INCLUDE_DIRECTORIES(src/os/unix)
 ENDIF(WIN32)
 
 IF(PA_USE_ASIO)
@@ -151,6 +157,16 @@ IF(PA_USE_WDMKS)
   SOURCE_GROUP("hostapi\\wdmks" FILES ${PA_WDMKS_SOURCES})
 ENDIF(PA_USE_WDMKS)
 
+IF(PA_USE_ALSA)
+  INCLUDE_DIRECTORIES(${ALSA_INCLUDE_DIR})
+
+  SET(PA_ALSA_INCLUDES include/pa_linux_alsa.h)
+
+  SET(PA_ALSA_SOURCES src/hostapi/alsa/pa_linux_alsa.c)
+
+  SOURCE_GROUP("hostapi\\alsa" FILES ${PA_ALSA_SOURCES})
+ENDIF(PA_USE_ALSA)
+
 SET(PA_SKELETON_SOURCES src/hostapi/skeleton/pa_hostapi_skeleton.c)
 
 SOURCE_GROUP("hostapi\\skeleton" ${PA_SKELETON_SOURCES})
@@ -163,6 +179,9 @@ IF(WIN32)
                   ${PA_WMME_INCLUDES}
                   ${PA_WASAPI_INCLUDES}
                   ${PA_WDMKS_INCLUDES})
+ELSEIF(UNIX)
+  SET(PA_INCLUDES include/portaudio.h
+                  ${PA_ALSA_INCLUDES})
 ENDIF(WIN32)
 
 SOURCE_GROUP("include" FILES ${PA_INCLUDES})
@@ -208,6 +227,11 @@ IF(WIN32)
                           src/os/win/pa_x86_plain_converters.c)
 
   SOURCE_GROUP("os\\win" FILES ${PA_PLATFORM_SOURCES})
+ELSEIF(UNIX)
+  SET(PA_PLATFORM_SOURCES src/os/unix/pa_unix_hostapis.c
+                          src/os/unix/pa_unix_util.c)
+
+  SOURCE_GROUP("os\\win" FILES ${PA_PLATFORM_SOURCES})
 ENDIF(WIN32)
 
 INCLUDE_DIRECTORIES( include )
@@ -233,10 +257,12 @@ IF(PA_UNICODE_BUILD)
   SET_SOURCE_FILES_PROPERTIES(${SOURCES_LESS_ASIO_SDK} PROPERTIES COMPILE_DEFINITIONS "UNICODE;_UNICODE")
 ENDIF(PA_UNICODE_BUILD)
 
+
 ADD_LIBRARY(portaudio SHARED ${PA_INCLUDES}
                              ${PA_COMMON_INCLUDES}
                              ${SOURCES_LESS_ASIO_SDK}
                              ${PA_ASIOSDK_SOURCES}
+                             ${PA_ALSA_SOURCES}
                              ${CMAKE_CURRENT_BINARY_DIR}/portaudio_cmake.def
                              ${CMAKE_CURRENT_BINARY_DIR}/options_cmake.h)
 
@@ -244,6 +270,7 @@ ADD_LIBRARY(portaudio_static STATIC ${PA_INCLUDES}
                                     ${PA_COMMON_INCLUDES}
                                     ${SOURCES_LESS_ASIO_SDK}
                                     ${PA_ASIOSDK_SOURCES}
+                                    ${PA_ALSA_SOURCES}
                                     ${CMAKE_CURRENT_BINARY_DIR}/options_cmake.h)
 
 # Configure the exports file according to settings
@@ -260,23 +287,27 @@ IF(WIN32)
   
   # If we use WDM/KS we need setupapi.lib
   IF(PA_USE_WDMKS)
-      TARGET_LINK_LIBRARIES(portaudio setupapi)
-    ENDIF(PA_USE_WDMKS)
+    TARGET_LINK_LIBRARIES(portaudio setupapi)
+  ENDIF(PA_USE_WDMKS)
   
-    SET_TARGET_PROPERTIES(portaudio PROPERTIES OUTPUT_NAME portaudio_${TARGET_POSTFIX})
-    SET_TARGET_PROPERTIES(portaudio_static PROPERTIES OUTPUT_NAME portaudio_static_${TARGET_POSTFIX})
-  ENDIF(WIN32)
+  SET_TARGET_PROPERTIES(portaudio PROPERTIES OUTPUT_NAME portaudio_${TARGET_POSTFIX})
+  SET_TARGET_PROPERTIES(portaudio_static PROPERTIES OUTPUT_NAME portaudio_static_${TARGET_POSTFIX})
+ELSEIF(UNIX)
+  IF(PA_USE_ALSA)
+    TARGET_LINK_LIBRARIES(portaudio ${ALSA_LIBRARY})
+    TARGET_LINK_LIBRARIES(portaudio_static ${ALSA_LIBRARY})
+  ENDIF(PA_USE_ALSA)
+ENDIF(WIN32)
   
-  OPTION(PA_BUILD_TESTS "Include test projects" OFF)
-  OPTION(PA_BUILD_EXAMPLES "Include example projects" OFF)
-  
-  # Prepared for inclusion of test files
-  IF(PA_BUILD_TESTS)
-    SUBDIRS(test)
-  ENDIF(PA_BUILD_TESTS)
-  
-  # Prepared for inclusion of test files
-  IF(PA_BUILD_EXAMPLES)
-    SUBDIRS(examples)
-  ENDIF(PA_BUILD_EXAMPLES)
-ENDIF()
+OPTION(PA_BUILD_TESTS "Include test projects" OFF)
+OPTION(PA_BUILD_EXAMPLES "Include example projects" OFF)
+
+# Prepared for inclusion of test files
+IF(PA_BUILD_TESTS)
+  SUBDIRS(test)
+ENDIF(PA_BUILD_TESTS)
+
+# Prepared for inclusion of test files
+IF(PA_BUILD_EXAMPLES)
+  SUBDIRS(examples)
+ENDIF(PA_BUILD_EXAMPLES)
